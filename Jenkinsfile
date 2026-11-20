@@ -1,6 +1,13 @@
-
 pipeline {
     agent any
+
+    environment {
+        KUBECONFIG = '/var/lib/jenkins/.kube/config'
+    }
+
+    triggers {
+        pollSCM('H/2 * * * *')
+    }
 
     stages {
         stage('Build') {
@@ -29,29 +36,17 @@ pipeline {
             }
         }
 
-        stage('Deploy') {
+        stage('Deploy to Kubernetes') {
             steps {
-                echo 'Deploying TaskFlow application...'
+                echo 'Applying Kubernetes manifests...'
                 sh '''
-                    if [ -f taskflow.pid ]; then
-                        kill "$(cat taskflow.pid)" 2>/dev/null || true
-                        rm -f taskflow.pid
-                    fi
+                    /usr/local/bin/kubectl apply -f k8s/deployment.yaml
+                    /usr/local/bin/kubectl apply -f k8s/service.yaml
 
-                    nohup .venv/bin/python app.py > taskflow.log 2>&1 &
-                    echo $! > taskflow.pid
+                    /usr/local/bin/kubectl rollout status deployment/taskflow --timeout=120s
 
-                    for i in $(seq 1 15); do
-                        if curl -fsS http://127.0.0.1:5000/health; then
-                            echo "TaskFlow deployment successful!"
-                            exit 0
-                        fi
-                        sleep 2
-                    done
-
-                    echo "Deployment health check failed."
-                    cat taskflow.log
-                    exit 1
+                    /usr/local/bin/kubectl get pods
+                    /usr/local/bin/kubectl get services
                 '''
             }
         }
@@ -59,14 +54,11 @@ pipeline {
 
     post {
         success {
-            echo 'TaskFlow CI/CD pipeline completed successfully!'
+            echo 'TaskFlow Kubernetes CI/CD pipeline completed successfully!'
         }
         failure {
-            echo 'TaskFlow CI/CD pipeline failed. Check the console output.'
-        }
-        always {
-            archiveArtifacts artifacts: 'taskflow.log',
-                             allowEmptyArchive: true
+            echo 'Pipeline failed. Check the Jenkins console output.'
         }
     }
 }
+
