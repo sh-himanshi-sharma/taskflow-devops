@@ -1,0 +1,33 @@
+---
+- name: Configure TaskFlow application
+  hosts: taskflow_servers
+
+  tasks:
+    - name: Install required system packages
+      apt:
+        name:
+          - python3
+          - python3-pip
+          - python3-venv
+        state: present
+        update_cache: true
+
+    - name: Create TaskFlow log directory
+      file:
+        path: /var/log/taskflow
+        state: directory
+        mode: '0755'
+
+    - name: Ensure TaskFlow project directory exists
+      file:
+        path: /home/himanshi/taskflow-devops
+        state: directory
+        owner: himanshi
+        group: himanshi
+        mode: '0755'
+
+    - name: Install TaskFlow Python dependencies
+      pip:
+        requirements: /home/himanshi/taskflow-devops/requirements.txt
+        virtualenv: /home/himanshi/taskflow-devops/.venv
+        virtualenv_command: python3 -m venv
